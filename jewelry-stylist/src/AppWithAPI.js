@@ -3,7 +3,7 @@ import { Upload, Sparkles, ShoppingBag, ChevronRight, X, Loader2 } from 'lucide-
 import './App.css';
 
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+const API_URL = 'https://powerful-amazement-production.up.railway.app';
 
 // Available style options (matches backend STYLE_PROFILES)
 const STYLE_OPTIONS = [
