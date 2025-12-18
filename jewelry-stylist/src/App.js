@@ -304,7 +304,7 @@ const JewelryStyleApp = () => {
                       ))}
                     </div>
                     <a 
-                      href={`https://www.google.com/search?q=${encodeURIComponent(`Cartier ${item.name}`)}`}
+                      href={`https://www.cartier.com/en-us/product/CR${item.ref}.html`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="block w-full mt-4 py-3 bg-slate-700/50 hover:bg-slate-700 text-slate-100 rounded transition-colors text-sm tracking-wider uppercase text-center"
