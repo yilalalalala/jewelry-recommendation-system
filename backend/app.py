@@ -32,7 +32,7 @@ from models import (
     RecommendationLog, get_engine
 )
 
-# Optional: Gemini for image analysis
+# Gemini for image analysis
 try:
     import google.generativeai as genai
     GEMINI_AVAILABLE = True
