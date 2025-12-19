@@ -1,0 +1,725 @@
+-- JEWELRY RECOMMENDATION SYSTEM - ADDITIONAL TABLES
+
+-- CUSTOMER & ORDER MANAGEMENT
+
+-- CUSTOMERS TABLE 
+CREATE TABLE IF NOT EXISTS customers (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_profile_id UUID REFERENCES user_profiles(id),
+    first_name VARCHAR(100) NOT NULL,
+    last_name VARCHAR(100) NOT NULL,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    phone VARCHAR(20),
+    date_of_birth DATE,
+    gender VARCHAR(20),
+    loyalty_tier VARCHAR(20) DEFAULT 'bronze', -- bronze, silver, gold, platinum
+    loyalty_points INTEGER DEFAULT 0,
+    total_spent DECIMAL(12,2) DEFAULT 0,
+    account_status VARCHAR(20) DEFAULT 'active',
+    email_verified BOOLEAN DEFAULT FALSE,
+    marketing_consent BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_customers_email ON customers(email);
+CREATE INDEX IF NOT EXISTS idx_customers_loyalty ON customers(loyalty_tier);
+CREATE INDEX IF NOT EXISTS idx_customers_user_profile ON customers(user_profile_id);
+
+-- CUSTOMER ADDRESSES TABLE
+CREATE TABLE IF NOT EXISTS customer_addresses (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    customer_id UUID REFERENCES customers(id) ON DELETE CASCADE,
+    address_type VARCHAR(20) NOT NULL, -- 'billing', 'shipping'
+    is_default BOOLEAN DEFAULT FALSE,
+    first_name VARCHAR(100),
+    last_name VARCHAR(100),
+    street_address VARCHAR(255) NOT NULL,
+    apartment VARCHAR(50),
+    city VARCHAR(100) NOT NULL,
+    state VARCHAR(100),
+    postal_code VARCHAR(20) NOT NULL,
+    country VARCHAR(100) NOT NULL DEFAULT 'United States',
+    phone VARCHAR(20),
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_addresses_customer ON customer_addresses(customer_id);
+CREATE INDEX IF NOT EXISTS idx_addresses_type ON customer_addresses(address_type);
+
+-- ORDERS TABLE
+CREATE TABLE IF NOT EXISTS orders (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    order_number VARCHAR(20) UNIQUE NOT NULL,
+    customer_id UUID REFERENCES customers(id),
+    session_id UUID REFERENCES outfit_sessions(id), -- Link to recommendation session
+    
+    -- Order Status
+    status VARCHAR(30) DEFAULT 'pending', -- pending, confirmed, processing, shipped, delivered, cancelled, returned
+    payment_status VARCHAR(20) DEFAULT 'pending', -- pending, paid, failed, refunded
+    
+    -- Pricing
+    subtotal DECIMAL(12,2) NOT NULL,
+    tax_amount DECIMAL(10,2) DEFAULT 0,
+    shipping_amount DECIMAL(10,2) DEFAULT 0,
+    discount_amount DECIMAL(10,2) DEFAULT 0,
+    total_amount DECIMAL(12,2) NOT NULL,
+    
+    -- Currency
+    currency VARCHAR(3) DEFAULT 'USD',
+    
+    -- Addresses (stored as JSON for historical record)
+    billing_address JSONB,
+    shipping_address JSONB,
+    
+    -- Shipping
+    shipping_method VARCHAR(50),
+    tracking_number VARCHAR(100),
+    estimated_delivery DATE,
+    
+    -- Notes
+    customer_notes TEXT,
+    internal_notes TEXT,
+    
+    -- Timestamps
+    ordered_at TIMESTAMPTZ DEFAULT NOW(),
+    confirmed_at TIMESTAMPTZ,
+    shipped_at TIMESTAMPTZ,
+    delivered_at TIMESTAMPTZ,
+    cancelled_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_orders_customer ON orders(customer_id);
+CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
+CREATE INDEX IF NOT EXISTS idx_orders_number ON orders(order_number);
+CREATE INDEX IF NOT EXISTS idx_orders_session ON orders(session_id);
+CREATE INDEX IF NOT EXISTS idx_orders_date ON orders(ordered_at);
+
+-- ORDER ITEMS TABLE
+CREATE TABLE IF NOT EXISTS order_items (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    order_id UUID REFERENCES orders(id) ON DELETE CASCADE,
+    item_id INTEGER REFERENCES jewelry_items(id),
+    
+    -- Item details at time of purchase (for historical record)
+    item_ref VARCHAR(20),
+    item_title VARCHAR(255),
+    item_price DECIMAL(10,2) NOT NULL,
+    
+    quantity INTEGER NOT NULL DEFAULT 1,
+    unit_price DECIMAL(10,2) NOT NULL,
+    discount_percent DECIMAL(5,2) DEFAULT 0,
+    line_total DECIMAL(10,2) NOT NULL,
+    
+    -- Size/customization
+    size VARCHAR(20),
+    engraving TEXT,
+    gift_wrap BOOLEAN DEFAULT FALSE,
+    gift_message TEXT,
+    
+    -- Recommendation tracking
+    recommendation_rank INTEGER, -- Position in recommendation list when purchased
+    recommendation_score DECIMAL(5,2), -- ML score when recommended
+    
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_order_items_order ON order_items(order_id);
+CREATE INDEX IF NOT EXISTS idx_order_items_item ON order_items(item_id);
+
+-- SHOPPING CART TABLE
+CREATE TABLE IF NOT EXISTS shopping_carts (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    customer_id UUID REFERENCES customers(id),
+    session_id UUID REFERENCES outfit_sessions(id),
+    status VARCHAR(20) DEFAULT 'active', -- active, abandoned, converted
+    
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    expires_at TIMESTAMPTZ DEFAULT (NOW() + INTERVAL '7 days')
+);
+
+CREATE INDEX IF NOT EXISTS idx_carts_customer ON shopping_carts(customer_id);
+CREATE INDEX IF NOT EXISTS idx_carts_status ON shopping_carts(status);
+
+-- CART ITEMS TABLE
+CREATE TABLE IF NOT EXISTS cart_items (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    cart_id UUID REFERENCES shopping_carts(id) ON DELETE CASCADE,
+    item_id INTEGER REFERENCES jewelry_items(id),
+    quantity INTEGER NOT NULL DEFAULT 1,
+    size VARCHAR(20),
+    added_from_recommendation BOOLEAN DEFAULT FALSE,
+    recommendation_rank INTEGER,
+    
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_cart_items_cart ON cart_items(cart_id);
+CREATE INDEX IF NOT EXISTS idx_cart_items_item ON cart_items(item_id);
+
+-- WISHLIST & FAVORITES
+
+-- WISHLISTS TABLE
+CREATE TABLE IF NOT EXISTS wishlists (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    customer_id UUID REFERENCES customers(id) ON DELETE CASCADE,
+    name VARCHAR(100) DEFAULT 'My Wishlist',
+    is_public BOOLEAN DEFAULT FALSE,
+    share_token VARCHAR(50) UNIQUE,
+    
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_wishlists_customer ON wishlists(customer_id);
+
+-- WISHLIST ITEMS TABLE
+CREATE TABLE IF NOT EXISTS wishlist_items (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    wishlist_id UUID REFERENCES wishlists(id) ON DELETE CASCADE,
+    item_id INTEGER REFERENCES jewelry_items(id),
+    priority INTEGER DEFAULT 0, -- 0=normal, 1=high, 2=must-have
+    notes TEXT,
+    price_at_addition DECIMAL(10,2), -- Track price when added
+    
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_wishlist_items_wishlist ON wishlist_items(wishlist_id);
+CREATE INDEX IF NOT EXISTS idx_wishlist_items_item ON wishlist_items(item_id);
+
+-- REVIEWS & RATINGS
+
+-- REVIEWS TABLE
+CREATE TABLE IF NOT EXISTS reviews (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    item_id INTEGER REFERENCES jewelry_items(id) ON DELETE CASCADE,
+    customer_id UUID REFERENCES customers(id),
+    order_id UUID REFERENCES orders(id), -- Verified purchase
+    
+    rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
+    title VARCHAR(200),
+    content TEXT,
+    
+    -- Detailed ratings
+    quality_rating INTEGER CHECK (quality_rating >= 1 AND quality_rating <= 5),
+    value_rating INTEGER CHECK (value_rating >= 1 AND value_rating <= 5),
+    style_rating INTEGER CHECK (style_rating >= 1 AND style_rating <= 5),
+    
+    -- Review metadata
+    is_verified_purchase BOOLEAN DEFAULT FALSE,
+    is_featured BOOLEAN DEFAULT FALSE,
+    helpful_votes INTEGER DEFAULT 0,
+    
+    -- Moderation
+    status VARCHAR(20) DEFAULT 'pending', -- pending, approved, rejected
+    moderated_at TIMESTAMPTZ,
+    moderated_by VARCHAR(100),
+    
+    -- Media
+    images TEXT[], -- Array of image URLs
+    
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_reviews_item ON reviews(item_id);
+CREATE INDEX IF NOT EXISTS idx_reviews_customer ON reviews(customer_id);
+CREATE INDEX IF NOT EXISTS idx_reviews_rating ON reviews(rating);
+CREATE INDEX IF NOT EXISTS idx_reviews_status ON reviews(status);
+
+-- PROMOTIONS & DISCOUNTS
+
+-- PROMOTIONS TABLE
+CREATE TABLE IF NOT EXISTS promotions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    code VARCHAR(50) UNIQUE NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    description TEXT,
+    
+    -- Discount type
+    discount_type VARCHAR(20) NOT NULL, -- 'percentage', 'fixed_amount', 'free_shipping'
+    discount_value DECIMAL(10,2) NOT NULL,
+    
+    -- Conditions
+    min_purchase_amount DECIMAL(10,2) DEFAULT 0,
+    max_discount_amount DECIMAL(10,2), -- Cap for percentage discounts
+    
+    -- Applicability
+    applies_to VARCHAR(20) DEFAULT 'all', -- 'all', 'category', 'collection', 'specific_items'
+    applicable_categories INTEGER[], -- Array of category IDs
+    applicable_collections TEXT[], -- Array of collection names
+    applicable_items INTEGER[], -- Array of item IDs
+    
+    -- Usage limits
+    usage_limit INTEGER, -- Total uses allowed
+    usage_per_customer INTEGER DEFAULT 1,
+    current_usage INTEGER DEFAULT 0,
+    
+    -- Validity
+    starts_at TIMESTAMPTZ NOT NULL,
+    ends_at TIMESTAMPTZ NOT NULL,
+    is_active BOOLEAN DEFAULT TRUE,
+    
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_promotions_code ON promotions(code);
+CREATE INDEX IF NOT EXISTS idx_promotions_active ON promotions(is_active);
+CREATE INDEX IF NOT EXISTS idx_promotions_dates ON promotions(starts_at, ends_at);
+
+-- PROMOTION USAGE TABLE
+CREATE TABLE IF NOT EXISTS promotion_usage (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    promotion_id UUID REFERENCES promotions(id),
+    customer_id UUID REFERENCES customers(id),
+    order_id UUID REFERENCES orders(id),
+    discount_applied DECIMAL(10,2),
+    
+    used_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_promo_usage_promotion ON promotion_usage(promotion_id);
+CREATE INDEX IF NOT EXISTS idx_promo_usage_customer ON promotion_usage(customer_id);
+
+-- SUPPLIER & PROCUREMENT
+
+-- SUPPLIERS TABLE
+CREATE TABLE IF NOT EXISTS suppliers (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(200) NOT NULL,
+    contact_name VARCHAR(100),
+    email VARCHAR(255),
+    phone VARCHAR(20),
+    website VARCHAR(255),
+    
+    -- Address
+    address TEXT,
+    city VARCHAR(100),
+    country VARCHAR(100),
+    
+    -- Business details
+    tax_id VARCHAR(50),
+    payment_terms VARCHAR(50), -- 'net30', 'net60', 'cod'
+    lead_time_days INTEGER, -- Average lead time
+    
+    -- Rating
+    quality_rating DECIMAL(3,2), -- 1-5
+    reliability_rating DECIMAL(3,2),
+    
+    status VARCHAR(20) DEFAULT 'active',
+    notes TEXT,
+    
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_suppliers_status ON suppliers(status);
+
+-- 13. PURCHASE ORDERS TABLE
+CREATE TABLE IF NOT EXISTS purchase_orders (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    po_number VARCHAR(20) UNIQUE NOT NULL,
+    supplier_id UUID REFERENCES suppliers(id),
+    
+    status VARCHAR(30) DEFAULT 'draft', -- draft, submitted, confirmed, shipped, received, cancelled
+    
+    -- Pricing
+    subtotal DECIMAL(12,2),
+    tax_amount DECIMAL(10,2) DEFAULT 0,
+    shipping_amount DECIMAL(10,2) DEFAULT 0,
+    total_amount DECIMAL(12,2),
+    currency VARCHAR(3) DEFAULT 'USD',
+    
+    -- Dates
+    order_date DATE,
+    expected_date DATE,
+    received_date DATE,
+    
+    notes TEXT,
+    
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_po_supplier ON purchase_orders(supplier_id);
+CREATE INDEX IF NOT EXISTS idx_po_status ON purchase_orders(status);
+
+-- PURCHASE ORDER ITEMS TABLE
+CREATE TABLE IF NOT EXISTS purchase_order_items (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    purchase_order_id UUID REFERENCES purchase_orders(id) ON DELETE CASCADE,
+    item_id INTEGER REFERENCES jewelry_items(id),
+    
+    quantity_ordered INTEGER NOT NULL,
+    quantity_received INTEGER DEFAULT 0,
+    unit_cost DECIMAL(10,2) NOT NULL,
+    line_total DECIMAL(10,2) NOT NULL,
+    
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_po_items_po ON purchase_order_items(purchase_order_id);
+CREATE INDEX IF NOT EXISTS idx_po_items_item ON purchase_order_items(item_id);
+
+-- ANALYTICS & TRACKING
+
+-- PAGE VIEWS TABLE
+CREATE TABLE IF NOT EXISTS page_views (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    session_id UUID REFERENCES outfit_sessions(id),
+    customer_id UUID REFERENCES customers(id),
+    item_id INTEGER REFERENCES jewelry_items(id),
+    
+    page_type VARCHAR(50), -- 'home', 'category', 'product', 'cart', 'checkout'
+    referrer_url TEXT,
+    
+    -- Device info
+    device_type VARCHAR(20), -- 'desktop', 'mobile', 'tablet'
+    browser VARCHAR(50),
+    os VARCHAR(50),
+    
+    -- Location
+    country VARCHAR(100),
+    city VARCHAR(100),
+    
+    viewed_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_page_views_session ON page_views(session_id);
+CREATE INDEX IF NOT EXISTS idx_page_views_item ON page_views(item_id);
+CREATE INDEX IF NOT EXISTS idx_page_views_date ON page_views(viewed_at);
+
+-- SEARCH LOGS TABLE
+CREATE TABLE IF NOT EXISTS search_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    session_id UUID REFERENCES outfit_sessions(id),
+    customer_id UUID REFERENCES customers(id),
+    
+    search_query TEXT NOT NULL,
+    filters_applied JSONB, -- {category: 'rings', min_price: 1000, styles: ['romantic']}
+    results_count INTEGER,
+    
+    -- User action after search
+    clicked_item_id INTEGER REFERENCES jewelry_items(id),
+    clicked_position INTEGER,
+    
+    searched_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_search_logs_session ON search_logs(session_id);
+CREATE INDEX IF NOT EXISTS idx_search_logs_date ON search_logs(searched_at);
+
+-- PRICE HISTORY TABLE
+CREATE TABLE IF NOT EXISTS price_history (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    item_id INTEGER REFERENCES jewelry_items(id) ON DELETE CASCADE,
+    
+    old_price DECIMAL(10,2),
+    new_price DECIMAL(10,2) NOT NULL,
+    change_reason VARCHAR(100), -- 'regular', 'promotion', 'cost_increase', 'clearance'
+    changed_by VARCHAR(100),
+    
+    changed_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_price_history_item ON price_history(item_id);
+CREATE INDEX IF NOT EXISTS idx_price_history_date ON price_history(changed_at);
+
+-- ADDITIONAL VIEWS
+
+-- Customer order summary
+CREATE OR REPLACE VIEW v_customer_order_summary AS
+SELECT 
+    c.id AS customer_id,
+    c.first_name,
+    c.last_name,
+    c.email,
+    c.loyalty_tier,
+    COUNT(DISTINCT o.id) AS total_orders,
+    SUM(o.total_amount) AS lifetime_value,
+    AVG(o.total_amount) AS avg_order_value,
+    MAX(o.ordered_at) AS last_order_date,
+    COUNT(DISTINCT oi.item_id) AS unique_items_purchased
+FROM customers c
+LEFT JOIN orders o ON c.id = o.customer_id AND o.status NOT IN ('cancelled', 'returned')
+LEFT JOIN order_items oi ON o.id = oi.order_id
+GROUP BY c.id, c.first_name, c.last_name, c.email, c.loyalty_tier;
+
+-- Item performance
+CREATE OR REPLACE VIEW v_item_performance AS
+SELECT 
+    j.id,
+    j.ref,
+    j.title,
+    j.price,
+    cl.primary_style,
+    COALESCE(SUM(oi.quantity), 0) AS total_sold,
+    COALESCE(SUM(oi.line_total), 0) AS total_revenue,
+    COUNT(DISTINCT r.id) AS review_count,
+    ROUND(AVG(r.rating), 2) AS avg_rating,
+    COUNT(DISTINCT pv.id) AS page_views,
+    COUNT(DISTINCT wi.id) AS wishlist_adds
+FROM jewelry_items j
+LEFT JOIN clusters cl ON j.cluster_id = cl.id
+LEFT JOIN order_items oi ON j.id = oi.item_id
+LEFT JOIN reviews r ON j.id = r.item_id AND r.status = 'approved'
+LEFT JOIN page_views pv ON j.id = pv.item_id
+LEFT JOIN wishlist_items wi ON j.id = wi.item_id
+GROUP BY j.id, j.ref, j.title, j.price, cl.primary_style;
+
+-- Daily sales summary
+CREATE OR REPLACE VIEW v_daily_sales AS
+SELECT 
+    DATE(o.ordered_at) AS order_date,
+    COUNT(DISTINCT o.id) AS order_count,
+    SUM(o.total_amount) AS total_revenue,
+    AVG(o.total_amount) AS avg_order_value,
+    COUNT(DISTINCT o.customer_id) AS unique_customers,
+    SUM(oi.quantity) AS items_sold
+FROM orders o
+JOIN order_items oi ON o.id = oi.order_id
+WHERE o.status NOT IN ('cancelled')
+GROUP BY DATE(o.ordered_at)
+ORDER BY order_date DESC;
+
+-- INPUT DATA
+
+-- Insert sample customers
+INSERT INTO customers (first_name, last_name, email, phone, date_of_birth, gender, loyalty_tier, loyalty_points, total_spent, marketing_consent) VALUES
+    ('Emma', 'Johnson', 'emma.johnson@email.com', '+1-212-555-0101', '1990-03-15', 'female', 'gold', 2500, 15750.00, TRUE),
+    ('Sophia', 'Williams', 'sophia.w@email.com', '+1-310-555-0102', '1985-07-22', 'female', 'platinum', 5200, 42300.00, TRUE),
+    ('Olivia', 'Brown', 'olivia.brown@email.com', '+1-415-555-0103', '1992-11-08', 'female', 'silver', 800, 5200.00, FALSE),
+    ('Isabella', 'Davis', 'isabella.d@email.com', '+1-617-555-0104', '1988-05-30', 'female', 'gold', 1800, 12400.00, TRUE),
+    ('Mia', 'Miller', 'mia.miller@email.com', '+1-312-555-0105', '1995-09-12', 'female', 'bronze', 150, 980.00, TRUE),
+    ('Charlotte', 'Wilson', 'charlotte.w@email.com', '+1-206-555-0106', '1983-01-25', 'female', 'platinum', 8900, 78500.00, TRUE),
+    ('Amelia', 'Moore', 'amelia.moore@email.com', '+1-303-555-0107', '1991-04-18', 'female', 'silver', 650, 4100.00, FALSE),
+    ('Harper', 'Taylor', 'harper.t@email.com', '+1-404-555-0108', '1987-08-05', 'female', 'gold', 2100, 18900.00, TRUE),
+    ('Evelyn', 'Anderson', 'evelyn.a@email.com', '+1-702-555-0109', '1994-12-20', 'female', 'bronze', 320, 2150.00, TRUE),
+    ('Abigail', 'Thomas', 'abigail.t@email.com', '+1-503-555-0110', '1989-06-14', 'female', 'silver', 920, 6800.00, FALSE),
+    ('James', 'Martinez', 'james.m@email.com', '+1-214-555-0111', '1982-02-28', 'male', 'gold', 1500, 22000.00, TRUE),
+    ('Michael', 'Garcia', 'michael.g@email.com', '+1-713-555-0112', '1986-10-10', 'male', 'silver', 700, 8500.00, TRUE)
+ON CONFLICT (email) DO NOTHING;
+
+-- Insert customer addresses
+INSERT INTO customer_addresses (customer_id, address_type, is_default, first_name, last_name, street_address, apartment, city, state, postal_code, country, phone)
+SELECT 
+    c.id,
+    'shipping',
+    TRUE,
+    c.first_name,
+    c.last_name,
+    CASE (ROW_NUMBER() OVER ()) % 5
+        WHEN 0 THEN '123 Fifth Avenue'
+        WHEN 1 THEN '456 Park Avenue'
+        WHEN 2 THEN '789 Madison Avenue'
+        WHEN 3 THEN '321 Lexington Avenue'
+        ELSE '555 Broadway'
+    END,
+    CASE WHEN (ROW_NUMBER() OVER ()) % 3 = 0 THEN 'Apt ' || ((ROW_NUMBER() OVER ()) * 10 + 5)::TEXT ELSE NULL END,
+    CASE (ROW_NUMBER() OVER ()) % 4
+        WHEN 0 THEN 'New York'
+        WHEN 1 THEN 'Los Angeles'
+        WHEN 2 THEN 'Chicago'
+        ELSE 'San Francisco'
+    END,
+    CASE (ROW_NUMBER() OVER ()) % 4
+        WHEN 0 THEN 'NY'
+        WHEN 1 THEN 'CA'
+        WHEN 2 THEN 'IL'
+        ELSE 'CA'
+    END,
+    LPAD(((ROW_NUMBER() OVER ()) * 1111 + 10000)::TEXT, 5, '0'),
+    'United States',
+    c.phone
+FROM customers c;
+
+-- Insert sample suppliers
+INSERT INTO suppliers (name, contact_name, email, phone, website, address, city, country, payment_terms, lead_time_days, quality_rating, reliability_rating, status) VALUES
+    ('Swiss Gem Traders', 'Hans Mueller', 'hans@swissgem.ch', '+41-44-555-0001', 'www.swissgemtraders.ch', '123 Bahnhofstrasse', 'Zurich', 'Switzerland', 'net30', 14, 4.8, 4.9, 'active'),
+    ('Italian Gold Works', 'Marco Rossi', 'marco@italiangold.it', '+39-02-555-0002', 'www.italiangoldworks.it', '456 Via Montenapoleone', 'Milan', 'Italy', 'net30', 21, 4.7, 4.6, 'active'),
+    ('Belgian Diamond House', 'Pierre Dubois', 'pierre@belgiandiamonds.be', '+32-3-555-0003', 'www.belgiandiamondhouse.be', '789 Hoveniersstraat', 'Antwerp', 'Belgium', 'net60', 10, 4.9, 4.8, 'active'),
+    ('Japanese Pearl Co', 'Yuki Tanaka', 'yuki@japanpearl.jp', '+81-3-555-0004', 'www.japanesepearlco.jp', '321 Ginza', 'Tokyo', 'Japan', 'net30', 28, 4.6, 4.7, 'active'),
+    ('Thai Silver Artisans', 'Somchai Prasert', 'somchai@thaisilver.th', '+66-2-555-0005', 'www.thaisilverartisans.th', '555 Silom Road', 'Bangkok', 'Thailand', 'net30', 35, 4.4, 4.3, 'active')
+ON CONFLICT DO NOTHING;
+
+-- Insert sample promotions
+INSERT INTO promotions (code, name, description, discount_type, discount_value, min_purchase_amount, max_discount_amount, applies_to, usage_limit, usage_per_customer, starts_at, ends_at, is_active) VALUES
+    ('WELCOME15', 'Welcome Discount', '15% off your first purchase', 'percentage', 15.00, 500.00, 500.00, 'all', 1000, 1, NOW() - INTERVAL '30 days', NOW() + INTERVAL '365 days', TRUE),
+    ('HOLIDAY25', 'Holiday Special', '25% off holiday collection', 'percentage', 25.00, 1000.00, 1000.00, 'all', 500, 2, NOW() - INTERVAL '10 days', NOW() + INTERVAL '30 days', TRUE),
+    ('FREESHIP', 'Free Shipping', 'Free shipping on orders over $2000', 'free_shipping', 0.00, 2000.00, NULL, 'all', NULL, NULL, NOW() - INTERVAL '60 days', NOW() + INTERVAL '180 days', TRUE),
+    ('VIP500', 'VIP Exclusive', '$500 off for platinum members', 'fixed_amount', 500.00, 5000.00, NULL, 'all', 100, 1, NOW() - INTERVAL '5 days', NOW() + INTERVAL '60 days', TRUE),
+    ('LOVE20', 'Love Collection', '20% off Love collection', 'percentage', 20.00, 0.00, 2000.00, 'collection', 300, 3, NOW() - INTERVAL '15 days', NOW() + INTERVAL '45 days', TRUE)
+ON CONFLICT (code) DO NOTHING;
+
+-- sample orders
+DO $$
+DECLARE
+    customer_rec RECORD;
+    item_rec RECORD;
+    order_uuid UUID;
+    order_num TEXT;
+    order_total DECIMAL;
+    i INTEGER;
+BEGIN
+    FOR customer_rec IN SELECT id, total_spent FROM customers LIMIT 10 LOOP
+        -- Create 1-3 orders per customer
+        FOR i IN 1..((RANDOM() * 3)::INTEGER + 1) LOOP
+            order_uuid := gen_random_uuid();
+            order_num := 'ORD-' || TO_CHAR(NOW() - (RANDOM() * 180)::INTEGER * INTERVAL '1 day', 'YYYYMMDD') || '-' || LPAD((RANDOM() * 9999)::INTEGER::TEXT, 4, '0');
+            
+            -- Get a random item
+            SELECT id, price INTO item_rec FROM jewelry_items ORDER BY RANDOM() LIMIT 1;
+            
+            order_total := item_rec.price * (1 + RANDOM() * 0.5);
+            
+            INSERT INTO orders (id, order_number, customer_id, status, payment_status, subtotal, tax_amount, shipping_amount, total_amount, shipping_method, ordered_at, confirmed_at, shipped_at, delivered_at)
+            VALUES (
+                order_uuid,
+                order_num,
+                customer_rec.id,
+                CASE (RANDOM() * 4)::INTEGER 
+                    WHEN 0 THEN 'delivered'
+                    WHEN 1 THEN 'delivered'
+                    WHEN 2 THEN 'shipped'
+                    WHEN 3 THEN 'processing'
+                    ELSE 'delivered'
+                END,
+                'paid',
+                item_rec.price,
+                item_rec.price * 0.08,
+                CASE WHEN item_rec.price > 2000 THEN 0 ELSE 25.00 END,
+                order_total,
+                CASE WHEN item_rec.price > 5000 THEN 'Express Insured' ELSE 'Standard' END,
+                NOW() - (RANDOM() * 180)::INTEGER * INTERVAL '1 day',
+                NOW() - (RANDOM() * 179)::INTEGER * INTERVAL '1 day',
+                NOW() - (RANDOM() * 170)::INTEGER * INTERVAL '1 day',
+                NOW() - (RANDOM() * 160)::INTEGER * INTERVAL '1 day'
+            ) ON CONFLICT (order_number) DO NOTHING;
+            
+            -- Add order item
+            INSERT INTO order_items (order_id, item_id, item_ref, item_title, item_price, quantity, unit_price, line_total)
+            SELECT order_uuid, j.id, j.ref, j.title, j.price, 1, j.price, j.price
+            FROM jewelry_items j WHERE j.id = item_rec.id
+            ON CONFLICT DO NOTHING;
+        END LOOP;
+    END LOOP;
+END $$;
+
+-- sample reviews for popular items
+INSERT INTO reviews (item_id, customer_id, rating, title, content, quality_rating, value_rating, style_rating, is_verified_purchase, status, helpful_votes)
+SELECT 
+    j.id,
+    c.id,
+    (RANDOM() * 2 + 3)::INTEGER, -- 3-5 stars
+    CASE (RANDOM() * 5)::INTEGER
+        WHEN 0 THEN 'Absolutely stunning!'
+        WHEN 1 THEN 'Beautiful piece'
+        WHEN 2 THEN 'Exceeded expectations'
+        WHEN 3 THEN 'Perfect gift'
+        ELSE 'Love it!'
+    END,
+    CASE (RANDOM() * 5)::INTEGER
+        WHEN 0 THEN 'The craftsmanship is exceptional. I wear it every day and always receive compliments.'
+        WHEN 1 THEN 'Bought this as an anniversary gift. My wife absolutely loves it!'
+        WHEN 2 THEN 'The quality is outstanding. Worth every penny.'
+        WHEN 3 THEN 'Elegant and timeless. Exactly what I was looking for.'
+        ELSE 'Beautiful design and excellent packaging. Will definitely buy from here again.'
+    END,
+    (RANDOM() * 2 + 3)::INTEGER,
+    (RANDOM() * 2 + 3)::INTEGER,
+    (RANDOM() * 2 + 3)::INTEGER,
+    TRUE,
+    'approved',
+    (RANDOM() * 50)::INTEGER
+FROM jewelry_items j
+CROSS JOIN customers c
+WHERE j.id IN (SELECT id FROM jewelry_items ORDER BY RANDOM() LIMIT 20)
+AND c.id IN (SELECT id FROM customers ORDER BY RANDOM() LIMIT 5)
+LIMIT 50
+ON CONFLICT DO NOTHING;
+
+-- sample wishlists
+INSERT INTO wishlists (customer_id, name, is_public)
+SELECT id, 'My Favorites', FALSE FROM customers
+ON CONFLICT DO NOTHING;
+
+-- items to wishlists
+INSERT INTO wishlist_items (wishlist_id, item_id, priority, price_at_addition)
+SELECT 
+    w.id,
+    j.id,
+    (RANDOM() * 2)::INTEGER,
+    j.price
+FROM wishlists w
+CROSS JOIN jewelry_items j
+WHERE j.id IN (SELECT id FROM jewelry_items ORDER BY RANDOM() LIMIT 30)
+LIMIT 100
+ON CONFLICT DO NOTHING;
+
+-- page views
+INSERT INTO page_views (item_id, page_type, device_type, browser, country, city, viewed_at)
+SELECT 
+    j.id,
+    'product',
+    CASE (RANDOM() * 3)::INTEGER WHEN 0 THEN 'desktop' WHEN 1 THEN 'mobile' ELSE 'tablet' END,
+    CASE (RANDOM() * 4)::INTEGER WHEN 0 THEN 'Chrome' WHEN 1 THEN 'Safari' WHEN 2 THEN 'Firefox' ELSE 'Edge' END,
+    CASE (RANDOM() * 4)::INTEGER WHEN 0 THEN 'United States' WHEN 1 THEN 'United Kingdom' WHEN 2 THEN 'Canada' ELSE 'France' END,
+    CASE (RANDOM() * 6)::INTEGER WHEN 0 THEN 'New York' WHEN 1 THEN 'Los Angeles' WHEN 2 THEN 'London' WHEN 3 THEN 'Paris' WHEN 4 THEN 'Toronto' ELSE 'Chicago' END,
+    NOW() - (RANDOM() * 90)::INTEGER * INTERVAL '1 day' - (RANDOM() * 24)::INTEGER * INTERVAL '1 hour'
+FROM jewelry_items j
+CROSS JOIN generate_series(1, 10) -- 10 views per item on average
+WHERE j.id IN (SELECT id FROM jewelry_items ORDER BY RANDOM() LIMIT 100)
+LIMIT 500;
+
+-- search logs
+INSERT INTO search_logs (search_query, filters_applied, results_count, searched_at)
+VALUES 
+    ('diamond ring', '{"category": "rings", "min_price": 5000}', 45, NOW() - INTERVAL '5 days'),
+    ('love bracelet', '{"collection": "Love"}', 23, NOW() - INTERVAL '4 days'),
+    ('pink gold necklace', '{"material": "pink gold", "category": "necklaces"}', 18, NOW() - INTERVAL '3 days'),
+    ('wedding band', '{"category": "rings", "style": "classic"}', 34, NOW() - INTERVAL '2 days'),
+    ('pearl earrings', '{"material": "pearl", "category": "earrings"}', 12, NOW() - INTERVAL '1 day'),
+    ('panthère', '{"collection": "Panthère"}', 28, NOW() - INTERVAL '12 hours'),
+    ('emerald', '{"material": "emeralds"}', 15, NOW() - INTERVAL '6 hours'),
+    ('trinity ring', '{"collection": "Trinity", "category": "rings"}', 8, NOW() - INTERVAL '3 hours'),
+    ('under 2000', '{"max_price": 2000}', 156, NOW() - INTERVAL '1 hour'),
+    ('romantic style', '{"style": "romantic"}', 67, NOW() - INTERVAL '30 minutes')
+ON CONFLICT DO NOTHING;
+
+-- price history for some items
+INSERT INTO price_history (item_id, old_price, new_price, change_reason, changed_by)
+SELECT 
+    j.id,
+    j.price * 0.95,
+    j.price,
+    CASE (RANDOM() * 3)::INTEGER WHEN 0 THEN 'regular' WHEN 1 THEN 'cost_increase' ELSE 'market_adjustment' END,
+    'system'
+FROM jewelry_items j
+WHERE j.id IN (SELECT id FROM jewelry_items ORDER BY RANDOM() LIMIT 50);
+
+-- VERIFICATION QUERIES
+
+SELECT 'customers' as table_name, COUNT(*) as count FROM customers
+UNION ALL SELECT 'customer_addresses', COUNT(*) FROM customer_addresses
+UNION ALL SELECT 'orders', COUNT(*) FROM orders
+UNION ALL SELECT 'order_items', COUNT(*) FROM order_items
+UNION ALL SELECT 'reviews', COUNT(*) FROM reviews
+UNION ALL SELECT 'wishlists', COUNT(*) FROM wishlists
+UNION ALL SELECT 'wishlist_items', COUNT(*) FROM wishlist_items
+UNION ALL SELECT 'promotions', COUNT(*) FROM promotions
+UNION ALL SELECT 'suppliers', COUNT(*) FROM suppliers
+UNION ALL SELECT 'page_views', COUNT(*) FROM page_views
+UNION ALL SELECT 'search_logs', COUNT(*) FROM search_logs
+UNION ALL SELECT 'price_history', COUNT(*) FROM price_history;
+
+-- Test new views
+SELECT * FROM v_customer_order_summary LIMIT 5;
+SELECT * FROM v_item_performance ORDER BY total_sold DESC LIMIT 10;
+SELECT * FROM v_daily_sales LIMIT 10;
