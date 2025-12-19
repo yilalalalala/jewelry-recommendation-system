@@ -15,9 +15,7 @@ import uuid
 Base = declarative_base()
 
 
-# ============================================================
 # CORE PRODUCT TABLES
-# ============================================================
 
 class Category(Base):
     """Product categories: rings, necklaces, bracelets, earrings"""
@@ -201,9 +199,7 @@ class Inventory(Base):
         }
 
 
-# ============================================================
 # USER & SESSION TABLES
-# ============================================================
 
 class UserProfile(Base):
     """User profiles with JSONB preferences"""
@@ -320,9 +316,7 @@ class RecommendationLog(Base):
         }
 
 
-# ============================================================
 # DATABASE CONNECTION HELPER
-# ============================================================
 
 def get_engine(database_url: str):
     """Create SQLAlchemy engine"""
@@ -340,9 +334,7 @@ def init_db(engine):
     Base.metadata.create_all(engine)
 
 
-# ============================================================
 # EXAMPLE USAGE
-# ============================================================
 
 if __name__ == "__main__":
     # Example connection
@@ -354,13 +346,13 @@ if __name__ == "__main__":
     # Query examples using ORM
     print("=== ORM Query Examples ===\n")
     
-    # 1. Get all clusters
+    # Get all clusters
     clusters = session.query(Cluster).all()
     print("Clusters:")
     for c in clusters:
         print(f"  {c.id}: {c.primary_style} ({c.item_count} items)")
     
-    # 2. Get items by style
+    # Get items by style
     romantic_items = session.query(JewelryItem).join(Cluster).filter(
         Cluster.primary_style == 'romantic'
     ).limit(5).all()
@@ -368,7 +360,7 @@ if __name__ == "__main__":
     for item in romantic_items:
         print(f"  {item.ref}: {item.title} - ${item.price}")
     
-    # 3. Get items within budget
+    # Get items within budget
     budget_items = session.query(JewelryItem).join(Inventory).filter(
         JewelryItem.price.between(2000, 5000),
         Inventory.status == 'active',
