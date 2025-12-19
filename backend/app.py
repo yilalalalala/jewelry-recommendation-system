@@ -579,7 +579,7 @@ def get_recommendations_frontend(
     # Step 5: Format response for frontend
     recommendations = []
     for r in results:
-        match_score = min(r['total_score'] / 10.0, 1.0)
+        match_score = min(r['total_score'] / 7.0, 1.0)
         
         style_tags = []
         if r['cluster_style']:
