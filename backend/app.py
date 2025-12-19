@@ -59,12 +59,20 @@ if DATABASE_URL.startswith("postgres://"):
 engine = get_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-# Initialize Gemini if available
-if GEMINI_AVAILABLE and GEMINI_API_KEY:
-    genai.configure(api_key=GEMINI_API_KEY)
-    vision_model = genai.GenerativeModel('gemini-2.0-flash')
-else:
-    vision_model = None
+# Initialize Gemini
+vision_model = None
+if GEMINI_AVAILABLE:
+    try:
+        api_key = os.getenv('GEMINI_API_KEY')
+        if api_key:
+            genai.configure(api_key=api_key)
+            vision_model = genai.GenerativeModel('gemini-2.0-flash')
+            print(f"Gemini initialized successfully")
+        else:
+            print("Warning: GEMINI_API_KEY not found in environment")
+    except Exception as e:
+        print(f"Error initializing Gemini: {e}")
+        vision_model = None
 
 # ============================================================
 # FASTAPI APP
@@ -488,11 +496,16 @@ def health_check(db: Session = Depends(get_db)):
         item_count = db.query(func.count(JewelryItem.id)).scalar()
         cluster_count = db.query(func.count(Cluster.id)).scalar()
         
+        # Debug: Check if key exists
+        has_key = bool(os.getenv('GEMINI_API_KEY'))
+        
         return {
             "status": "healthy",
             "database": "connected",
             "items": item_count,
             "clusters": cluster_count,
+            "gemini_available": GEMINI_AVAILABLE,
+            "gemini_key_exists": has_key,
             "image_analysis": "enabled" if vision_model else "disabled"
         }
     except Exception as e:
