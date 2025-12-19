@@ -509,6 +509,10 @@ def health_check(db: Session = Depends(get_db)):
             "gemini_key_len": len(key_stripped),
             "vision_model_initialized": vision_model is not None,
             "image_analysis": "enabled" if vision_model else "disabled",
+            "railway_service": os.getenv("RAILWAY_SERVICE_NAME"),
+            "railway_env": os.getenv("RAILWAY_ENVIRONMENT"),
+            "has_env_key": "GEMINI_API_KEY" in os.environ,
+            "key_len": len((os.getenv("GEMINI_API_KEY") or "").strip()),
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
