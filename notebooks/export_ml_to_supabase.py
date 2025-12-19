@@ -18,9 +18,7 @@ SUPABASE_SERVICE_KEY = os.getenv('SUPABASE_SERVICE_KEY')  # Use service key for 
 # Initialize Supabase client
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
-print("="*70)
-print("EXPORTING ML MODEL TO SUPABASE")
-print("="*70)
+print("Exporting ML model to Supabase")
 
 # 1. Train ML Model
 print("\n[1/4] Training ML Model in memory...")
@@ -114,5 +112,5 @@ for item in result.data:
     print(f"   {item['ref']}: cluster={item['cluster_id']}, styles={item['style_tags']}, colors={item['color_tags']}")
 
 print("\n" + "="*70)
-print("EXPORT COMPLETE!")
+print("Export Complete!")
 print("="*70)
