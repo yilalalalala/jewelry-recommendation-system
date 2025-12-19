@@ -492,22 +492,23 @@ def root():
 
 @app.get("/health", tags=["Health"])
 def health_check(db: Session = Depends(get_db)):
-    try:
-        item_count = db.query(func.count(JewelryItem.id)).scalar()
-        cluster_count = db.query(func.count(Cluster.id)).scalar()
-        
-        # Debug: Check if key exists
-        has_key = bool(os.getenv('GEMINI_API_KEY'))
-        
-        return {
-            "status": "healthy",
-            "database": "connected",
-            "items": item_count,
-            "clusters": cluster_count,
-            "gemini_available": GEMINI_AVAILABLE,
-            "gemini_key_exists": has_key,
-            "image_analysis": "enabled" if vision_model else "disabled"
-        }
+    item_count = db.query(func.count(JewelryItem.id)).scalar()
+    cluster_count = db.query(func.count(Cluster.id)).scalar()
+
+    key = os.getenv("GEMINI_API_KEY")
+    key_stripped = key.strip() if key else ""
+
+    return {
+        "status": "healthy",
+        "database": "connected",
+        "items": item_count,
+        "clusters": cluster_count,
+        "gemini_available": GEMINI_AVAILABLE,
+        "gemini_key_exists": bool(key_stripped),
+        "gemini_key_len": len(key_stripped),
+        "vision_model_initialized": vision_model is not None,
+        "image_analysis": "enabled" if vision_model else "disabled",
+    }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
