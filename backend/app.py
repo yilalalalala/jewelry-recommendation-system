@@ -406,16 +406,44 @@ def get_recommendations_frontend(
         limit=6
     )
     
-    # Create session for logging
-    session_id = str(uuid.uuid4())
+    # Create outfit session (required for foreign key)
+    session_id = uuid.uuid4()
+    
+    try:
+        outfit_session = OutfitSession(
+            id=session_id,
+            preferred_styles=styles,
+            preferred_colors=colors,
+            min_price=budget_min,
+            max_price=budget_max
+        )
+        db.add(outfit_session)
+        db.flush()
+        
+        # Log recommendations
+        for r in results:
+            log = RecommendationLog(
+                session_id=session_id,
+                item_id=r['item_id'],
+                rank=r['rank'],
+                total_score=r['total_score'],
+                style_score=r['style_score'],
+                color_score=r['color_score'],
+                cluster_bonus=r['cluster_bonus'],
+                cluster_style=r['cluster_style']
+            )
+            db.add(log)
+        
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        print(f"Warning: Failed to log recommendations: {e}")
     
     # Convert to frontend format
     recommendations = []
     for r in results:
-        # Convert score from 0-10 to 0-1 for frontend percentage display
         match_score = min(r['total_score'] / 10.0, 1.0)
         
-        # Build style tags
         style_tags = []
         if r['cluster_style']:
             style_tags.append(r['cluster_style'])
@@ -429,25 +457,10 @@ def get_recommendations_frontend(
             match_score=round(match_score, 2),
             style_tags=style_tags
         ))
-        
-        # Log recommendation
-        log = RecommendationLog(
-            session_id=uuid.UUID(session_id),
-            item_id=r['item_id'],
-            rank=r['rank'],
-            total_score=r['total_score'],
-            style_score=r['style_score'],
-            color_score=r['color_score'],
-            cluster_bonus=r['cluster_bonus'],
-            cluster_style=r['cluster_style']
-        )
-        db.add(log)
-    
-    db.commit()
     
     return FrontendResponse(
         recommendations=recommendations,
-        session_id=session_id
+        session_id=str(session_id)
     )
 
 
