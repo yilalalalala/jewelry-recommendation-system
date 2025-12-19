@@ -492,25 +492,27 @@ def root():
 
 @app.get("/health", tags=["Health"])
 def health_check(db: Session = Depends(get_db)):
-    item_count = db.query(func.count(JewelryItem.id)).scalar()
-    cluster_count = db.query(func.count(Cluster.id)).scalar()
+    try:
+        item_count = db.query(func.count(JewelryItem.id)).scalar()
+        cluster_count = db.query(func.count(Cluster.id)).scalar()
 
-    key = os.getenv("GEMINI_API_KEY")
-    key_stripped = key.strip() if key else ""
+        key = os.getenv("GEMINI_API_KEY") or ""
+        key_stripped = key.strip()
 
-    return {
-        "status": "healthy",
-        "database": "connected",
-        "items": item_count,
-        "clusters": cluster_count,
-        "gemini_available": GEMINI_AVAILABLE,
-        "gemini_key_exists": bool(key_stripped),
-        "gemini_key_len": len(key_stripped),
-        "vision_model_initialized": vision_model is not None,
-        "image_analysis": "enabled" if vision_model else "disabled",
-    }
+        return {
+            "status": "healthy",
+            "database": "connected",
+            "items": item_count,
+            "clusters": cluster_count,
+            "gemini_available": GEMINI_AVAILABLE,
+            "gemini_key_exists": bool(key_stripped),
+            "gemini_key_len": len(key_stripped),
+            "vision_model_initialized": vision_model is not None,
+            "image_analysis": "enabled" if vision_model else "disabled",
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
 
 # ------------------------------------------------------------
 # MAIN RECOMMENDATION ENDPOINT
