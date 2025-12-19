@@ -34,7 +34,7 @@ from models import (
 
 # Gemini for image analysis
 try:
-    import google.generativeai as genai
+    from google import genai
     GEMINI_AVAILABLE = True
 except ImportError:
     GEMINI_AVAILABLE = False
@@ -60,19 +60,22 @@ engine = get_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 # Initialize Gemini
-vision_model = None
-if GEMINI_AVAILABLE:
+client = None
+
+@app.on_event("startup")
+def init_gemini():
+    global client
+    key = (os.getenv("GEMINI_API_KEY") or "").strip()
+    if not key:
+        print("No GEMINI_API_KEY at runtime")
+        return
     try:
-        api_key = os.getenv('GEMINI_API_KEY')
-        if api_key:
-            genai.configure(api_key=api_key)
-            vision_model = genai.GenerativeModel('gemini-2.0-flash')
-            print(f"Gemini initialized successfully")
-        else:
-            print("Warning: GEMINI_API_KEY not found in environment")
+        client = genai.Client(api_key=key)
+        print("Gemini client initialized")
     except Exception as e:
-        print(f"Error initializing Gemini: {e}")
-        vision_model = None
+        print(f"Gemini init failed: {e}")
+        client = None
+
 
 # ============================================================
 # FASTAPI APP
@@ -229,8 +232,8 @@ MATERIAL_TO_COLORS = {
 
 def analyze_outfit_image(image_data: str) -> Dict:
     """Analyze outfit image using Gemini Vision API"""
-    if not vision_model:
-        return {'colors': [], 'styles': []}
+    if not client:
+        return {"colors": [], "styles": []}
     
     try:
         # Remove data URL prefix if present
@@ -251,12 +254,15 @@ Return ONLY a JSON object with this exact format:
 
 Be specific and choose 2-4 colors and 1-3 styles that best match the outfit."""
         
-        response = vision_model.generate_content([
-            prompt,
-            {"mime_type": "image/jpeg", "data": image_bytes}
-        ])
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=[
+                prompt,
+                {"inline_data": {"mime_type": "image/jpeg", "data": image_bytes}},
+            ],
+        )
         
-        response_text = response.text.strip()
+        response_text = (response.text or "").strip()
         if '```json' in response_text:
             response_text = response_text.split('```json')[1].split('```')[0]
         elif '```' in response_text:
