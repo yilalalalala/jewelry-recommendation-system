@@ -513,6 +513,8 @@ def health_check(db: Session = Depends(get_db)):
             "railway_env": os.getenv("RAILWAY_ENVIRONMENT"),
             "has_env_key": "GEMINI_API_KEY" in os.environ,
             "key_len": len((os.getenv("GEMINI_API_KEY") or "").strip()),
+            "has_test_var": "TEST_VAR" in os.environ,
+            "test_var": os.getenv("TEST_VAR"),
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
