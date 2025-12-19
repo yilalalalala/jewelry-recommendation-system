@@ -1,19 +1,12 @@
-import React, { useState } from 'react';
-import { Upload, Sparkles, ShoppingBag, ChevronRight, X, Loader2 } from 'lucide-react';
-import './App.css';
+import React, { useState, useRef } from 'react';
+import { Upload, Sparkles, ChevronRight, X } from 'lucide-react';
 
-
+// ============================================================
+// CONFIGURATION - Railway FastAPI Backend
+// ============================================================
 const API_URL = 'https://powerful-amazement-production.up.railway.app';
 
-// Available style options (matches backend STYLE_PROFILES)
-const STYLE_OPTIONS = [
-  'classic', 'modern', 'romantic', 'bold', 
-  'bohemian', 'minimalist', 'vintage', 'luxurious'
-];
-
-const MATERIAL_OPTIONS = ['Gold', 'Silver', 'Platinum', 'Rose Gold'];
-
-function App() {
+const JewelryStyleApp = () => {
   const [step, setStep] = useState(1);
   const [uploadedImage, setUploadedImage] = useState(null);
   const [preferences, setPreferences] = useState({
@@ -24,9 +17,15 @@ function App() {
   });
   const [recommendations, setRecommendations] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const fileInputRef = useRef(null);
 
-  // Handle image upload
+  const styles = [
+    'classic', 'modern', 'romantic', 'bold',
+    'bohemian', 'minimalist', 'vintage', 'luxurious'
+  ];
+
+  const materials = ['Gold', 'Silver', 'Platinum', 'Rose Gold'];
+
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -39,7 +38,6 @@ function App() {
     }
   };
 
-  // Toggle style selection
   const toggleStyle = (style) => {
     setPreferences(prev => ({
       ...prev,
@@ -49,16 +47,15 @@ function App() {
     }));
   };
 
-  // Get recommendations from FastAPI backend
   const handleGetRecommendations = async () => {
     setLoading(true);
-    setError(null);
     
     try {
+      // Call Railway FastAPI backend with ORM
       const response = await fetch(`${API_URL}/get-recommendations`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           image: uploadedImage,
@@ -67,22 +64,24 @@ function App() {
       });
 
       if (!response.ok) {
-        throw new Error(`API error: ${response.status}`);
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       const data = await response.json();
+      console.log('API Response:', data);
+      
       setRecommendations(data.recommendations || []);
       setStep(3);
-    } catch (err) {
-      console.error('Failed to get recommendations:', err);
-      setError('Failed to get recommendations. Please try again.');
-    } finally {
-      setLoading(false);
+    } catch (error) {
+      console.error('Error fetching recommendations:', error);
+      alert('Failed to get recommendations. Please try again.');
+      setRecommendations([]);
     }
+    
+    setLoading(false);
   };
 
-  // Reset to start
-  const handleReset = () => {
+  const resetApp = () => {
     setStep(1);
     setUploadedImage(null);
     setPreferences({
@@ -92,201 +91,162 @@ function App() {
       material: ''
     });
     setRecommendations([]);
-    setError(null);
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Parisienne&display=swap');
+      `}</style>
       {/* Header */}
-      <header className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Sparkles className="w-8 h-8 text-purple-600" />
-            <h1 className="text-2xl font-bold text-gray-800">Jewelry Stylist</h1>
-          </div>
-          <div className="text-sm text-gray-500">
-            Powered by AI + SQLAlchemy ORM
+      <header className="border-b border-slate-700/50 bg-slate-900/50 backdrop-blur-sm">
+        <div className="max-w-7xl mx-auto px-6 py-6">
+          <div className="flex items-center justify-between">
+            <h1 className="text-3xl tracking-wide" style={{ fontFamily: 'Parisienne, cursive', color: '#D4AF37' }}>
+              Maison de Bijoux
+            </h1>
+            {step > 1 && (
+              <button
+                onClick={resetApp}
+                className="text-slate-400 hover:text-slate-200 transition-colors text-sm tracking-wider"
+              >
+                START OVER
+              </button>
+            )}
           </div>
         </div>
       </header>
 
-      {/* Progress Steps */}
-      <div className="max-w-4xl mx-auto px-4 py-6">
-        <div className="flex items-center justify-center gap-4 mb-8">
-          {[1, 2, 3].map((s) => (
-            <div key={s} className="flex items-center">
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold
-                ${step >= s ? 'bg-purple-600 text-white' : 'bg-gray-200 text-gray-500'}`}>
-                {s}
-              </div>
-              {s < 3 && <ChevronRight className="w-6 h-6 text-gray-400 mx-2" />}
-            </div>
-          ))}
-        </div>
-
+      <main className="max-w-7xl mx-auto px-6 py-12">
         {/* Step 1: Upload Image */}
         {step === 1 && (
-          <div className="bg-white rounded-2xl shadow-lg p-8 text-center">
-            <Upload className="w-16 h-16 text-purple-600 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold text-gray-800 mb-2">Upload Your Outfit</h2>
-            <p className="text-gray-600 mb-6">Share a photo of your outfit to get matching jewelry recommendations</p>
-            
-            <label className="inline-block cursor-pointer">
+          <div className="max-w-2xl mx-auto">
+            <div className="text-center mb-12">
+              <h2 className="text-4xl font-light text-slate-100 mb-4 tracking-wide">
+                Your Personal <span style={{ fontFamily: 'Parisienne, cursive', color: '#D4AF37' }}>Cartier</span> Jewelry Stylist
+              </h2>
+              <p className="text-slate-400 text-lg">
+                Upload your outfit and discover perfectly curated jewelry pieces
+              </p>
+            </div>
+
+            <div
+              onClick={() => fileInputRef.current?.click()}
+              className="relative border-2 border-dashed border-slate-600 rounded-lg p-16 text-center cursor-pointer hover:border-slate-500 transition-all group bg-slate-800/30"
+            >
               <input
+                ref={fileInputRef}
                 type="file"
                 accept="image/*"
                 onChange={handleImageUpload}
                 className="hidden"
               />
-              <span className="bg-purple-600 hover:bg-purple-700 text-white px-8 py-3 rounded-lg font-semibold inline-flex items-center gap-2 transition-colors">
-                <Upload className="w-5 h-5" />
-                Choose Photo
-              </span>
-            </label>
-            
-            <p className="text-sm text-gray-500 mt-4">
-              Or skip this step and go directly to preferences
-            </p>
-            <button
-              onClick={() => setStep(2)}
-              className="text-purple-600 hover:text-purple-700 font-medium mt-2"
-            >
-              Skip to preferences →
-            </button>
+              <Upload className="w-16 h-16 mx-auto mb-6 text-slate-500 group-hover:text-slate-400 transition-colors" />
+              <p className="text-slate-300 text-lg mb-2">Upload Your Outfit</p>
+              <p className="text-slate-500 text-sm">
+                Click to select or drag and drop an image
+              </p>
+            </div>
+
+            <div className="mt-12 flex items-center justify-center gap-2 text-slate-500 text-sm">
+              <Sparkles className="w-4 h-4" />
+              <span>Personal recommendations based on your style</span>
+            </div>
           </div>
         )}
 
         {/* Step 2: Preferences */}
         {step === 2 && (
-          <div className="bg-white rounded-2xl shadow-lg p-8">
-            <h2 className="text-2xl font-bold text-gray-800 mb-6 text-center">Your Preferences</h2>
-            
-            {/* Uploaded Image Preview */}
-            {uploadedImage && (
-              <div className="mb-6 relative inline-block">
-                <img src={uploadedImage} alt="Uploaded outfit" className="w-32 h-32 object-cover rounded-lg" />
-                <button
-                  onClick={() => setUploadedImage(null)}
-                  className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1"
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+            {/* Left: Image Preview */}
+            <div className="space-y-6">
+              <h2 className="text-2xl font-light text-slate-100 tracking-wide">Your Outfit</h2>
+              <div className="relative rounded-lg overflow-hidden bg-slate-800 aspect-[3/4]">
+                <img
+                  src={uploadedImage}
+                  alt="Uploaded outfit"
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            </div>
+
+            {/* Right: Preferences Form */}
+            <div className="space-y-8">
+              <h2 className="text-2xl font-light text-slate-100 tracking-wide">Style Preferences</h2>
+
+              {/* Style Selection */}
+              <div>
+                <label className="block text-slate-300 mb-4 text-sm tracking-wider uppercase">
+                  Select Styles
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  {styles.map(style => (
+                    <button
+                      key={style}
+                      onClick={() => toggleStyle(style)}
+                      className={`px-4 py-3 rounded border text-sm tracking-wider uppercase transition-all ${
+                        preferences.styles.includes(style)
+                          ? 'bg-slate-100 text-slate-900 border-slate-100'
+                          : 'bg-slate-800/50 text-slate-400 border-slate-700 hover:border-slate-600'
+                      }`}
+                    >
+                      {style}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Budget Range */}
+              <div>
+                <label className="block text-slate-300 mb-4 text-sm tracking-wider uppercase">
+                  Budget Range
+                </label>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <input
+                      type="number"
+                      value={preferences.budgetMin}
+                      onChange={(e) => setPreferences({...preferences, budgetMin: parseInt(e.target.value)})}
+                      className="w-full px-4 py-3 bg-slate-800/50 border border-slate-700 rounded text-slate-100 focus:border-slate-500 focus:outline-none"
+                      placeholder="Min"
+                    />
+                  </div>
+                  <div>
+                    <input
+                      type="number"
+                      value={preferences.budgetMax}
+                      onChange={(e) => setPreferences({...preferences, budgetMax: parseInt(e.target.value)})}
+                      className="w-full px-4 py-3 bg-slate-800/50 border border-slate-700 rounded text-slate-100 focus:border-slate-500 focus:outline-none"
+                      placeholder="Max"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Material */}
+              <div>
+                <label className="block text-slate-300 mb-4 text-sm tracking-wider uppercase">
+                  Preferred Material
+                </label>
+                <select
+                  value={preferences.material}
+                  onChange={(e) => setPreferences({...preferences, material: e.target.value})}
+                  className="w-full px-4 py-3 bg-slate-800/50 border border-slate-700 rounded text-slate-100 focus:border-slate-500 focus:outline-none"
                 >
-                  <X className="w-4 h-4" />
-                </button>
+                  <option value="">Any Material</option>
+                  {materials.map(mat => (
+                    <option key={mat} value={mat}>{mat}</option>
+                  ))}
+                </select>
               </div>
-            )}
 
-            {/* Style Selection */}
-            <div className="mb-6">
-              <label className="block text-sm font-semibold text-gray-700 mb-3">
-                Select Styles (choose one or more)
-              </label>
-              <div className="flex flex-wrap gap-2">
-                {STYLE_OPTIONS.map((style) => (
-                  <button
-                    key={style}
-                    onClick={() => toggleStyle(style)}
-                    className={`px-4 py-2 rounded-full text-sm font-medium transition-colors capitalize
-                      ${preferences.styles.includes(style)
-                        ? 'bg-purple-600 text-white'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
-                  >
-                    {style}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Budget Range */}
-            <div className="mb-6">
-              <label className="block text-sm font-semibold text-gray-700 mb-3">
-                Budget Range: ${preferences.budgetMin.toLocaleString()} - ${preferences.budgetMax.toLocaleString()}
-              </label>
-              <div className="flex gap-4 items-center">
-                <input
-                  type="range"
-                  min="100"
-                  max="50000"
-                  step="100"
-                  value={preferences.budgetMin}
-                  onChange={(e) => setPreferences(prev => ({
-                    ...prev,
-                    budgetMin: Math.min(parseInt(e.target.value), prev.budgetMax - 100)
-                  }))}
-                  className="flex-1"
-                />
-                <input
-                  type="range"
-                  min="100"
-                  max="50000"
-                  step="100"
-                  value={preferences.budgetMax}
-                  onChange={(e) => setPreferences(prev => ({
-                    ...prev,
-                    budgetMax: Math.max(parseInt(e.target.value), prev.budgetMin + 100)
-                  }))}
-                  className="flex-1"
-                />
-              </div>
-              <div className="flex justify-between text-sm text-gray-500 mt-1">
-                <span>$100</span>
-                <span>$50,000</span>
-              </div>
-            </div>
-
-            {/* Material Preference */}
-            <div className="mb-8">
-              <label className="block text-sm font-semibold text-gray-700 mb-3">
-                Preferred Material (optional)
-              </label>
-              <div className="flex flex-wrap gap-2">
-                {MATERIAL_OPTIONS.map((material) => (
-                  <button
-                    key={material}
-                    onClick={() => setPreferences(prev => ({
-                      ...prev,
-                      material: prev.material === material ? '' : material
-                    }))}
-                    className={`px-4 py-2 rounded-full text-sm font-medium transition-colors
-                      ${preferences.material === material
-                        ? 'bg-purple-600 text-white'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
-                  >
-                    {material}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Error Message */}
-            {error && (
-              <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
-                {error}
-              </div>
-            )}
-
-            {/* Action Buttons */}
-            <div className="flex gap-4">
-              <button
-                onClick={() => setStep(1)}
-                className="flex-1 px-6 py-3 border border-gray-300 rounded-lg font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
-              >
-                Back
-              </button>
               <button
                 onClick={handleGetRecommendations}
-                disabled={loading || preferences.styles.length === 0}
-                className="flex-1 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-300 text-white px-6 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 transition-colors"
+                disabled={preferences.styles.length === 0}
+                className="w-full bg-slate-100 text-slate-900 py-4 rounded hover:bg-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-light tracking-wider uppercase flex items-center justify-center gap-2"
               >
-                {loading ? (
-                  <>
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                    Finding matches...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="w-5 h-5" />
-                    Get Recommendations
-                  </>
-                )}
+                Get Recommendations
+                <ChevronRight className="w-5 h-5" />
               </button>
             </div>
           </div>
@@ -294,81 +254,78 @@ function App() {
 
         {/* Step 3: Recommendations */}
         {step === 3 && (
-          <div className="bg-white rounded-2xl shadow-lg p-8">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-gray-800">Your Recommendations</h2>
-              <button
-                onClick={handleReset}
-                className="text-purple-600 hover:text-purple-700 font-medium"
-              >
-                Start Over
-              </button>
+          <div className="space-y-8">
+            <div className="text-center">
+              <h2 className="text-3xl font-light text-slate-100 mb-2 tracking-wide">
+                Your Curated Collection
+              </h2>
+              <p className="text-slate-400">
+                {Math.min(recommendations.length, 6)} pieces selected exclusively for you
+              </p>
             </div>
 
-            {recommendations.length === 0 ? (
-              <div className="text-center py-12">
-                <ShoppingBag className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                <p className="text-gray-500">No matching items found. Try adjusting your preferences.</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {recommendations.map((item) => (
-                  <div key={item.id} className="border rounded-xl overflow-hidden hover:shadow-lg transition-shadow">
-                    <div className="aspect-square bg-gray-100 relative">
-                      {item.image_url ? (
-                        <img
-                          src={item.image_url}
-                          alt={item.name}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <ShoppingBag className="w-12 h-12 text-gray-300" />
-                        </div>
-                      )}
-                      <div className="absolute top-2 right-2 bg-purple-600 text-white text-xs font-bold px-2 py-1 rounded-full">
-                        {Math.round(item.match_score * 100)}% match
-                      </div>
-                    </div>
-                    <div className="p-4">
-                      <h3 className="font-semibold text-gray-800 mb-1">{item.name}</h3>
-                      <p className="text-lg font-bold text-purple-600 mb-2">
-                        ${item.price.toLocaleString()}
-                      </p>
-                      <div className="flex flex-wrap gap-1 mb-3">
-                        {item.style_tags?.map((tag) => (
-                          <span
-                            key={tag}
-                            className="text-xs bg-purple-50 text-purple-700 px-2 py-1 rounded-full capitalize"
-                          >
-                            {tag}
-                          </span>
-                        ))}
-                      </div>
-                      <a
-                        href={`https://www.cartier.com/en-us/jewelry/all-jewelry/CR${item.ref}.html`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="block text-center bg-gray-900 hover:bg-gray-800 text-white py-2 rounded-lg text-sm font-medium transition-colors"
-                      >
-                        View Details
-                      </a>
-                    </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {recommendations.slice(0, 6).map(item => (
+                <div
+                  key={item.id}
+                  className="bg-slate-800/30 border border-slate-700/50 rounded-lg overflow-hidden hover:border-slate-600 transition-all group"
+                >
+                  <div className="aspect-[4/3] bg-slate-800 overflow-hidden">
+                    <img
+                      src={item.image_url}
+                      alt={item.name}
+                      className="w-full h-full object-contain p-4 group-hover:scale-105 transition-transform duration-500"
+                    />
                   </div>
-                ))}
-              </div>
-            )}
+                  <div className="p-6 space-y-3">
+                    <h3 className="text-lg font-light text-slate-100 tracking-wide min-h-[3rem]">
+                      {item.name}
+                    </h3>
+                    <div className="flex items-center justify-between">
+                      <span className="text-2xl font-light text-slate-100">
+                        ${item.price.toLocaleString()}
+                      </span>
+                      <span className="text-sm text-slate-400">
+                        {Math.round(item.match_score * 100)}% Match
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {item.style_tags?.slice(0, 3).map(tag => (
+                        <span
+                          key={tag}
+                          className="px-2 py-1 bg-slate-700/50 text-slate-300 text-xs rounded uppercase tracking-wider"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                    <a 
+                      href={`https://www.cartier.com/en-us/jewelry/all-jewelry/CR${item.ref}.html`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block w-full mt-4 py-3 bg-slate-700/50 hover:bg-slate-700 text-slate-100 rounded transition-colors text-sm tracking-wider uppercase text-center"
+                    >
+                      View Details
+                    </a>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
-      </div>
 
-      {/* Footer */}
-      <footer className="mt-auto py-6 text-center text-sm text-gray-500">
-        <p>CSCI-GA.2433 Database Systems - Jewelry Recommendation Project</p>
-        <p className="mt-1">Cao & Ngo • Part 4: End-to-End with ORM</p>
-      </footer>
+        {loading && (
+          <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-50">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-slate-100 mx-auto mb-4"></div>
+              <p className="text-slate-100 tracking-wider">Curating your collection...</p>
+            </div>
+          </div>
+        )}
+      </main>
+
     </div>
   );
-}
+};
 
-export default App;
+export default JewelryStyleApp;
