@@ -1,14 +1,6 @@
 """
-Jewelry Recommendation API - FastAPI with K-Modes ML + SQLAlchemy ORM
+Jewelry Recommendation with FastAPI, K-Modes ML and SQLAlchemy ORM
 
-Combines:
-- K-Modes clustering and scoring logic (from jewelry_ml_model.py)
-- SQLAlchemy ORM for database access
-- Gemini Vision for image analysis
-
-Author: Cao & Ngo
-Course: CSCI-GA.2433-001 Database Systems
-Project: Part 4 - End-to-End Solution with ORM + ML
 """
 
 import os
@@ -40,9 +32,7 @@ except ImportError:
     GEMINI_AVAILABLE = False
     print("Warning: google-generativeai not installed. Image analysis disabled.")
 
-# ============================================================
 # CONFIGURATION
-# ============================================================
 
 DATABASE_URL = os.environ.get(
     "DATABASE_URL",
@@ -76,10 +66,7 @@ def init_gemini():
         print(f"Gemini init failed: {e}")
         client = None
 
-
-# ============================================================
 # FASTAPI APP
-# ============================================================
 
 app = FastAPI(
     title="Jewelry Recommendation API",
@@ -97,9 +84,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ============================================================
 # DEPENDENCY
-# ============================================================
 
 def get_db():
     db = SessionLocal()
@@ -108,9 +93,7 @@ def get_db():
     finally:
         db.close()
 
-# ============================================================
 # PYDANTIC SCHEMAS
-# ============================================================
 
 class FrontendRecommendationRequest(BaseModel):
     image: Optional[str] = Field(default=None, description="Base64 encoded image")
@@ -138,11 +121,9 @@ class FrontendResponse(BaseModel):
     session_id: Optional[str] = None
     image_analysis: Optional[dict] = None
 
-# ============================================================
 # ML CONSTANTS (from jewelry_ml_model.py)
-# ============================================================
 
-# Scoring weights - your teammate's version
+# Scoring weights
 WEIGHT_STYLE = 0.55      # 55% - Direct style match
 WEIGHT_COLOR = 0.30      # 30% - Color coordination  
 WEIGHT_CLUSTER = 0.15    # 15% - Cluster-style alignment
@@ -150,7 +131,7 @@ WEIGHT_CLUSTER = 0.15    # 15% - Cluster-style alignment
 STYLE_GEM_WEIGHT = 0.70
 STYLE_BAND_WEIGHT = 0.30
 
-# Style profiles from your teammate's ML model
+# Style profiles
 STYLE_PROFILES = {
     'classic': {
         'gems': ['diamond', 'diamonds', 'sapphire', 'sapphires', 'pearl'],
@@ -226,9 +207,7 @@ MATERIAL_TO_COLORS = {
     'Rose Gold': ['pink', 'gold']
 }
 
-# ============================================================
 # IMAGE ANALYSIS using Gemini Vision
-# ============================================================
 
 def analyze_outfit_image(image_data: str) -> Dict:
     """Analyze outfit image using Gemini Vision API"""
@@ -279,9 +258,7 @@ Be specific and choose 2-4 colors and 1-3 styles that best match the outfit."""
         print(f"Error analyzing image: {e}")
         return {'colors': [], 'styles': []}
 
-# ============================================================
 # RECOMMENDATION ENGINE (K-Modes Logic + ORM)
-# ============================================================
 
 class RecommendationEngine:
     """
@@ -334,8 +311,6 @@ class RecommendationEngine:
     
     def calculate_style_score(self, item: JewelryItem, preferred_styles: List[str]) -> float:
         """
-        Calculate style match score using your teammate's logic
-        
         Returns: 0 to 5.5 points (55% weight * 10 max)
         """
         if not preferred_styles:
@@ -378,8 +353,6 @@ class RecommendationEngine:
     
     def calculate_color_score(self, item: JewelryItem, preferred_colors: List[str]) -> float:
         """
-        Calculate color match score
-        
         Returns: 0 to 3.0 points (30% weight * 10 max)
         """
         if not preferred_colors:
@@ -482,9 +455,7 @@ class RecommendationEngine:
         
         return results
 
-# ============================================================
 # API ENDPOINTS
-# ============================================================
 
 @app.get("/", tags=["Health"])
 def root():
@@ -526,9 +497,7 @@ def health_check(db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 
-# ------------------------------------------------------------
 # MAIN RECOMMENDATION ENDPOINT
-# ------------------------------------------------------------
 
 @app.post("/get-recommendations", response_model=FrontendResponse, tags=["Recommendations"])
 def get_recommendations_frontend(
@@ -536,18 +505,16 @@ def get_recommendations_frontend(
     db: Session = Depends(get_db)
 ):
     """
-    Get jewelry recommendations with K-Modes ML scoring + ORM
-    
     Scoring: Total (0-10) = Style (55%) + Color (30%) + Cluster (15%)
     """
     prefs = request.preferences
     
-    # Step 1: Analyze image if provided
+    # Analyze image if provided
     image_analysis = {'colors': [], 'styles': []}
     if request.image and vision_model:
         image_analysis = analyze_outfit_image(request.image)
     
-    # Step 2: Combine preferences
+    # Combine preferences
     user_styles = [s.lower() for s in prefs.get('styles', [])]
     all_styles = list(set(user_styles + image_analysis['styles']))
     
@@ -561,7 +528,7 @@ def get_recommendations_frontend(
     budget_min = prefs.get('budgetMin', 0)
     budget_max = prefs.get('budgetMax', 500000)
     
-    # Step 3: Get recommendations using K-Modes scoring + ORM
+    # Get recommendations using K-Modes scoring + ORM
     rec_engine = RecommendationEngine(db)
     results = rec_engine.get_recommendations(
         preferred_styles=all_styles,
@@ -571,7 +538,7 @@ def get_recommendations_frontend(
         limit=6
     )
     
-    # Step 4: Log session and recommendations (with error handling)
+    # Log session and recommendations (with error handling)
     session_id = uuid.uuid4()
     
     try:
@@ -604,7 +571,7 @@ def get_recommendations_frontend(
         db.rollback()
         print(f"Warning: Failed to log recommendations: {e}")
     
-    # Step 5: Format response for frontend
+    # Format response for frontend
     recommendations = []
     for r in results:
         match_score = min(0.50 + (r['total_score'] / 10.0), 1.0)
@@ -629,9 +596,7 @@ def get_recommendations_frontend(
         image_analysis=image_analysis if image_analysis['colors'] else None
     )
 
-# ------------------------------------------------------------
 # ITEMS ENDPOINT
-# ------------------------------------------------------------
 
 @app.get("/items", tags=["Items"])
 def list_items(
@@ -657,9 +622,7 @@ def list_items(
         "items": [item.to_dict() for item in items]
     }
 
-# ------------------------------------------------------------
 # CLUSTERS ENDPOINT
-# ------------------------------------------------------------
 
 @app.get("/clusters", tags=["Clusters"])
 def list_clusters(db: Session = Depends(get_db)):
@@ -681,9 +644,7 @@ def list_clusters(db: Session = Depends(get_db)):
         for c, count, avg in clusters
     ]
 
-# ------------------------------------------------------------
 # ANALYTICS ENDPOINT
-# ------------------------------------------------------------
 
 @app.get("/analytics/overview", tags=["Analytics"])
 def get_analytics(db: Session = Depends(get_db)):
@@ -701,10 +662,8 @@ def get_analytics(db: Session = Depends(get_db)):
         "total_clicks": total_clicks,
         "ctr": round(total_clicks / total_recs * 100, 2) if total_recs > 0 else 0
     }
-
-# ============================================================
+    
 # MAIN
-# ============================================================
 
 if __name__ == "__main__":
     import uvicorn
