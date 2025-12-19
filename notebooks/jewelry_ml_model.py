@@ -320,8 +320,7 @@ class JewelryRecommender:
         if 'modern' in styles:
           if row.get('yellow gold', 0) == 1 or row.get('pink gold', 0) == 1:
               raw *= 0.6  # Heavy penalty for warm gold in a "Modern" search
-
-        # --- NEW PURITY CHECK ---
+              
         # If user wants Bohemian/Vintage but item is "Diamond-heavy" (Luxurious), 
         # apply a small penalty so pure Bohemian pieces rank higher.
         is_diamond_heavy = row.get('diamonds', 0) == 1 or row.get('diamond', 0) == 1
@@ -345,7 +344,7 @@ class JewelryRecommender:
         """
         Calculate cluster bonus based on BOTH style and color alignment.
 
-        This is the key improvement: items in clusters whose assigned styles
+        Items in clusters whose assigned styles
         match the user's preferred styles get a bonus.
         """
         cluster_id = row['cluster']
